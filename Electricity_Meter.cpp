@@ -1,3 +1,6 @@
+#include <Wire.h>
+#include <Tiny4kOLED.h>
+
 #include "Sensor.h"
 #include "GPS.h"
 
@@ -15,77 +18,63 @@ GPS gps;
 
 void setup(){
     Serial.begin(115200);
-
-    voltage.DEBUG = false;
-    Serial.print("Voltage Factor : ");
-    Serial.println(voltage.calibrate(110));
-
-    current.DEBUG = false;
-    Serial.print("Current Factor : ");
-    Serial.println(current.calibrate(10));
+    
+    oled.begin(0, 0);
+    oled.enableChargePump();
+    oled.setRotation(1);
+    oled.enableZoomIn();
+    oled.setFont(FONT6X8);
+    updateDisplay();
+    oled.switchRenderFrame();
+    updateDisplay();
+    oled.switchFrame();
+    oled.on();
 }
 
 void loop(){
-    //  VOLTAGE
+    updateDisplay();
+    oled.switchFrame();
+    delay(50);
+}
+
+void updateDisplay(){
+  //  VOLTAGE
     voltage.readToBuffer();
     T vrms = voltage.toVal(voltage.rms());
     FFT_Result<T> vResult = voltage.fft();
-    
-    Serial.print("Vrms : ");
-    Serial.print(vrms);
-    Serial.print("\t");
-    Serial.print("Peak Freq: ");
-    Serial.print(vResult.freq);
-    Serial.print("\t");
-    Serial.print("Phase : ");
-    Serial.println(vResult.phase);
-
 
     //  CURRENT
     current.readToBuffer();
     T irms = current.toVal(current.rms());
     FFT_Result<T> iResult = current.fft();
     
-    Serial.print("Irms : ");
-    Serial.print(irms);
-    Serial.print("\t");
-    Serial.print("Peak Freq: ");
-    Serial.print(iResult.freq);
-    Serial.print("\t");
-    Serial.print("Phase : ");
-    Serial.println(iResult.phase);
-    
     //  POWER
     T phi = abs(vResult.phase - iResult.phase);
 
-    Serial.print("Apparent Power : ");
-    Serial.print(vrms * irms);
-    Serial.print("\t");
-    Serial.print("Real Power : ");
-    Serial.print(vrms * vrms * cos(phi));
-    Serial.print("\t");
-    Serial.print("Reactive Power : ");
-    Serial.print(vrms * vrms * sin(phi));
-    Serial.print("\t");
-    Serial.print("Power Factor : ");
-    Serial.println(cos(phi));
+    T apparent_pow = vrms * irms; 
+    T real_pow = vrms * vrms * cos(phi);
+    T reactive_pow = vrms * vrms * sin(phi);
+    T pow_factor = cos(phi);
 
-    /*
-    // GPS
-    // Need another UART channel to read
     
+    // GPS
     String s = "";
-    while(true){
-        if(!Serial1.available()) continue;
-        char c = Serial1.read();
+    while(Serial.available()){
+        char c = Serial.read();
         if(c == '\n'){
             if(s.substring(0, 6) == "$GPRMC"){
-                Serial.println(s);
                 gps.decode(s);
-                Serial.print("Valid : "); Serial.println(gps.valid);
-                Serial.println("Time : " + gps.date + " " + gps.time);
-                Serial.print("Latitude : "); Serial.print(gps.latitude); Serial.println(gps.N_S);
-                Serial.print("Longitude : "); Serial.print(gps.longitude); Serial.println(gps.E_W);
+                /*
+                Serial.println("Valid : " + gps.valid);
+                Serial.print("Time : ");
+                Serial.println(gps.date + " " + gps.time);
+                Serial.print("Latitude : ");
+                Serial.print(gps.latitude);
+                Serial.println(' ' + gps.N_S);
+                Serial.print("Longitude : ");
+                Serial.print(gps.longitude);
+                Serial.println(' ' + gps.E_W);
+                */
                 break;
             }
             s = "";
@@ -93,9 +82,28 @@ void loop(){
             s += c;
         }
     }
-    */
-   
-    Serial.print("\n\n");
+  
+    oled.clear();
+    oled.setCursor(0, 0);
+    oled.print(F("V: "));
+    oled.print(vrms);
+    oled.print(F("V  "));
+    oled.print(vResult.freq);
+    oled.print(F("Hz"));
+    
+    oled.setCursor(0, 1);
+    oled.print(F("I: "));
+    oled.print(irms);
+    oled.print(F("A  "));
+    oled.print(iResult.freq);
+    oled.print(F("Hz"));
 
-    delay(1000);
+    oled.setCursor(0, 2);
+    oled.print(gps.date + " " + gps.time);
+    oled.setCursor(0, 3);
+    oled.print(gps.latitude);
+    oled.print("  ");
+    oled.print(gps.longitude);
+
+    
 }
