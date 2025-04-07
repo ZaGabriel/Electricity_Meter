@@ -2,7 +2,6 @@
 #include <Tiny4kOLED.h>
 
 #include "Sensor.h"
-#include "GPS.h"
 
 #define T double
 
@@ -14,10 +13,12 @@ using namespace std;
 
 Sensor<T> voltage(sensor::ZMPT1018, A0, SAMPLE_RATE, BUFFER_SIZE, FIR_ORDER);
 Sensor<T> current(sensor::CWCS7600, A1, SAMPLE_RATE, BUFFER_SIZE, FIR_ORDER);
-GPS gps;
 
 void setup(){
     Serial.begin(115200);
+
+    //Serial.println(voltage.calibrate(110));
+    //Serial.println(current.calibrate(12));
     
     oled.begin(0, 0);
     oled.enableChargePump();
@@ -34,7 +35,7 @@ void setup(){
 void loop(){
     updateDisplay();
     oled.switchFrame();
-    delay(50);
+    //delay(50);
 }
 
 void updateDisplay(){
@@ -51,38 +52,23 @@ void updateDisplay(){
     //  POWER
     T phi = abs(vResult.phase - iResult.phase);
 
-    T apparent_pow = vrms * irms; 
-    T real_pow = vrms * vrms * cos(phi);
-    T reactive_pow = vrms * vrms * sin(phi);
+    T apparent_pow = vrms * irms;
     T pow_factor = cos(phi);
-
+    T real_pow = apparent_pow * pow_factor;
+    T reactive_pow = apparent_pow * sin(phi);
     
-    // GPS
-    String s = "";
-    while(Serial.available()){
-        char c = Serial.read();
-        if(c == '\n'){
-            if(s.substring(0, 6) == "$GPRMC"){
-                gps.decode(s);
-                /*
-                Serial.println("Valid : " + gps.valid);
-                Serial.print("Time : ");
-                Serial.println(gps.date + " " + gps.time);
-                Serial.print("Latitude : ");
-                Serial.print(gps.latitude);
-                Serial.println(' ' + gps.N_S);
-                Serial.print("Longitude : ");
-                Serial.print(gps.longitude);
-                Serial.println(' ' + gps.E_W);
-                */
-                break;
-            }
-            s = "";
-        }else{
-            s += c;
-        }
-    }
-  
+
+    Serial.print("Vrms:"); Serial.println(vrms);
+    Serial.print("VrmsPeakFreq:"); Serial.println(vResult.freq);
+    Serial.print("VrmsPhase: "); Serial.println(vResult.phase);
+    Serial.print("Irms:"); Serial.println(irms);
+    Serial.print("IrmsPeakFreq:"); Serial.println(iResult.freq);
+    Serial.print("IrmsPhase:"); Serial.println(iResult.phase);
+    Serial.print("ApparentPower:"); Serial.println(apparent_pow);
+    Serial.print("RealPower:"); Serial.println(real_pow);
+    Serial.print("ReactivePower:"); Serial.println(reactive_pow);
+    Serial.print("PowerFactor:"); Serial.println(pow_factor);
+    
     oled.clear();
     oled.setCursor(0, 0);
     oled.print(F("V: "));
@@ -98,12 +84,11 @@ void updateDisplay(){
     oled.print(iResult.freq);
     oled.print(F("Hz"));
 
-    oled.setCursor(0, 2);
-    oled.print(gps.date + " " + gps.time);
     oled.setCursor(0, 3);
-    oled.print(gps.latitude);
-    oled.print("  ");
-    oled.print(gps.longitude);
-
+    oled.print(F("P: "));
+    oled.print(apparent_pow);
+    oled.print("W  ");
+    oled.print(real_pow);
+    oled.print("W");
     
 }
